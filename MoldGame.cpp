@@ -2,10 +2,10 @@
 
 using std::to_string;
 
-const int MAX_MAP_ROWS = 20;
-const int MAX_MAP_COLS = 20;
-const int TILE_WIDTH = 60;
-const int TILE_HEIGHT = 60;
+const int MAX_MAP_ROWS = 30;
+const int MAX_MAP_COLS = 30;
+const int TILE_WIDTH = 30;
+const int TILE_HEIGHT = 30;
 
 enum tile_kind
 {
@@ -13,12 +13,6 @@ enum tile_kind
     GRASS_TILE,
     DIRT_TILE,
     SAND_TILE
-};
-
-enum explorer_state_kind
-{
-    PLAYING_STATE,
-    EDITING_STATE
 };
 
 struct tile_data
@@ -34,7 +28,6 @@ struct map_data
 struct explorer_data
 {
     map_data map;
-    explorer_state_kind explorer_state;
     tile_kind editor_tile_kind;
     point_2d camera;
 };
@@ -53,7 +46,6 @@ void init_map(map_data &map)
 void init_explorer(explorer_data &explorer)
 {
     init_map(explorer.map);
-    explorer.explorer_state = PLAYING_STATE;
     explorer.editor_tile_kind = GRASS_TILE;
     explorer.camera = point_at(0, 0);
 }
@@ -120,28 +112,17 @@ void draw_explorer(const explorer_data &explorer)
 
     draw_map(explorer.map, explorer.camera);
 
-    if (explorer.explorer_state == EDITING_STATE)
-    {
-        fill_rectangle(color_white(), 0, 0, TILE_WIDTH + 10, TILE_HEIGHT + 25);
-        fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), 5, 20, TILE_WIDTH, TILE_HEIGHT);
+    fill_rectangle(color_white(), 0, 0, TILE_WIDTH + 10, TILE_HEIGHT + 25);
+    fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), 5, 20, TILE_WIDTH, TILE_HEIGHT);
 
-        draw_text("Editor", color_black(), 0, 10);
-        draw_text("Kind: " + to_string(((int)explorer.editor_tile_kind) + 1), color_black(), 0, 30);
-    }
-    else if (explorer.explorer_state == PLAYING_STATE)
-    {
-        draw_text("Playing - Shift E to edit", color_black(), 0, 10);
-    }
+    draw_text("Editor", color_black(), 0, 10);
+    draw_text("Kind: " + to_string(((int)explorer.editor_tile_kind) + 1), color_black(), 0, 30);
 
     refresh_screen();
 }
 
 void handle_editor_input(explorer_data &explorer)
 {
-    if (key_down(ESCAPE_KEY))
-    {
-        explorer.explorer_state = PLAYING_STATE;
-    }
 
     if (key_down(R_KEY))
     {
@@ -180,14 +161,7 @@ void handle_editor_input(explorer_data &explorer)
 
 void handle_input(explorer_data &explorer)
 {
-    if (key_down(LEFT_SHIFT_KEY) && key_down(E_KEY))
-    {
-        explorer.explorer_state = EDITING_STATE;
-    }
-    if (explorer.explorer_state == EDITING_STATE)
-    {
-        handle_editor_input(explorer);
-    }
+    handle_editor_input(explorer);
 
     if (key_down(LEFT_KEY))
     {
