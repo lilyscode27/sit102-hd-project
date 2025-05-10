@@ -1,4 +1,5 @@
 #include "splashkit.h"
+#include <vector>
 #include <queue>
 using namespace std;
 
@@ -31,7 +32,8 @@ enum mold_state
     PREPARE,
     SPREADING,
     DONE_SPREADING,
-    FIXING
+    FIXING,
+    BROKEN
 };
 
 // Structure to represent a single tile
@@ -70,7 +72,7 @@ struct mold_data
 
     mold_state state; // Current state of the mold
 
-    long appear_at_time;    // Time for the mold to appear
+    long appear_at_time;    // Time when the mold appears
     long last_spread_time;  // Last time mold spread
     long time_to_start_fix; // Time to start fixing mold
 
@@ -79,16 +81,21 @@ struct mold_data
 
     queue<pair<int, int>> q; // Queue for BFS during spreading
 
-    // Check if it's time for the mold to appear
-    bool is_time_to_appear(long current_time) const
-    {
-        return current_time > appear_at_time;
-    }
-
     // Check if it's time for the mold to spread
     bool is_time_to_spread(long current_time) const
     {
         return current_time >= last_spread_time + 1000;
+    }
+};
+
+struct molds_data
+{
+    vector<mold_data> v; // Vector to store all molds
+    long time_to_appear_next;
+
+    bool is_time_to_appear_next(long current_time) const
+    {
+        return current_time > time_to_appear_next;
     }
 };
 
@@ -112,9 +119,9 @@ mold_data init_mold(int start_c, int start_r)
 
     mold.state = PREPARE; // Initialize state
 
-    mold.appear_at_time = timer_ticks(GAME_TIMER) + 1000 + rnd(0, 2000); // Random time between 1 and 3 seconds
-    mold.last_spread_time = mold.appear_at_time;                         // Initialize last spread time
-    mold.time_to_start_fix = 0;                                          // Initialize time to start fix
+    mold.appear_at_time = timer_ticks(GAME_TIMER); // Set appearance time
+    mold.last_spread_time = 0;                     // Initialize last spread time
+    mold.time_to_start_fix = 0;                    // Initialize time to start fix
 
     // Initialize the spread locations
     for (int i = 0; i < MAX_MAP_COLS * MAX_MAP_ROWS; i++)
@@ -125,6 +132,13 @@ mold_data init_mold(int start_c, int start_r)
     mold.spreads_count = 0;
 
     return mold;
+}
+
+molds_data init_molds()
+{
+    molds_data molds;
+    molds.time_to_appear_next = 0;
+    return molds;
 }
 
 // Function to spread mold to neighboring tiles
@@ -165,13 +179,12 @@ void spread_mold(map_data &map, mold_data &mold)
 // Handle the lifecycle of mold (appearance, spreading, fixing, breaking)
 void handle_mold_lifecycle(map_data &map, mold_data &mold)
 {
-    // Handle
-    if (mold.state == PREPARE && mold.is_time_to_appear(timer_ticks(GAME_TIMER)))
+    if (mold.state == PREPARE)
     {
         mold.q.push({mold.start_c, mold.start_r});
         mold.spread[mold.spreads_count++] = init_loc(mold.start_c, mold.start_r);
         map.tiles[mold.start_c][mold.start_r].kind = MOLDY_TILE;
-        write_line("Mold spread started at: " + to_string(mold.start_c) + ", " + to_string(mold.start_r));
+        mold.last_spread_time = timer_ticks(GAME_TIMER); // Set the appear_at_time to the current time + 1 second
         mold.state = SPREADING; // Set state to spreading
     }
 
@@ -191,7 +204,7 @@ void handle_mold_lifecycle(map_data &map, mold_data &mold)
     }
 
     // Handle broken state of mold
-    if (timer_ticks(GAME_TIMER) > mold.time_to_start_fix)
+    if (mold.state == FIXING && timer_ticks(GAME_TIMER) > mold.time_to_start_fix)
     {
         for (int i = 0; i < mold.spreads_count; i++)
         {
@@ -200,6 +213,7 @@ void handle_mold_lifecycle(map_data &map, mold_data &mold)
                 map.tiles[mold.spread[i].c][mold.spread[i].r].kind = BROKEN_TILE;
             }
         }
+        mold.state = BROKEN; // Set state to broken
     }
 }
 
@@ -279,7 +293,7 @@ void draw_explorer(explorer_data &explorer)
     clear_screen(color_white());
 
     draw_map(explorer.map, explorer.camera);
-    
+
     draw_rectangle(color_black(), explorer.camera.x, explorer.camera.y + 10, 50, 50);
     fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
     draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
@@ -362,6 +376,8 @@ int main()
     int start_r = rnd(0, MAX_MAP_ROWS - 1);
     mold_data mold = init_mold(start_c, start_r);
 
+    molds_data molds;
+
     open_window("Map Explorer", 800, 600);
 
     create_timer(GAME_TIMER);
@@ -371,7 +387,40 @@ int main()
     {
         handle_input(explorer);
 
-        handle_mold_lifecycle(explorer.map, mold);
+        int start_c, start_r;
+        if (molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
+        {
+            write_line("New mold appeared!");
+
+            do
+            {
+                start_c = rnd(0, MAX_MAP_COLS - 1);
+                start_r = rnd(0, MAX_MAP_ROWS - 1);
+                write_line("New mold position: " + to_string(start_c) + ", " + to_string(start_r));
+            } while (explorer.map.tiles[start_c][start_r].kind != NORMAL_TILE);
+
+            mold_data new_mold = init_mold(start_c, start_r); // Initialize new mold
+            molds.v.push_back(new_mold); // Add new mold to the vector
+
+            molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 + rnd(0, 2000); // Set time for next mold appearance
+        }
+
+        // Update all molds
+        if (!molds.v.empty()) {
+            for (int i = 0; i < molds.v.size(); i++)
+            {
+                // Handle mold lifecycle
+                handle_mold_lifecycle(explorer.map, molds.v[i]);
+
+                // Check if mold lifecycle is finished
+                if (molds.v[i].state == BROKEN)
+                {
+                    molds.v.erase(molds.v.begin() + i); // Remove finished mold
+                    write_line("Mold lifecycle finished.");
+                    i--; // Adjust index after erasing
+                }
+            }
+        }
 
         draw_explorer(explorer);
 
