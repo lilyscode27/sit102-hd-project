@@ -1,20 +1,21 @@
-
 #include "splashkit.h"
 #include <queue>
 using namespace std;
 
 using std::to_string;
 
-const int MAX_MAP_ROWS = 10;
-const int MAX_MAP_COLS = 10;
-const int TILE_WIDTH = 30;
-const int TILE_HEIGHT = 30;
+// Constants for map dimensions and tile sizes
+const int MAX_MAP_ROWS = 50;
+const int MAX_MAP_COLS = 50;
+const int TILE_WIDTH = 10;
+const int TILE_HEIGHT = 10;
 const string GAME_TIMER = "Game Timer";
 
 // Directions for 8-connected neighbors (up, down, left, right, and diagonals)
 const int DX[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
 const int DY[8] = {0, 0, -1, 1, -1, 1, -1, 1};
 
+// Enum for different types of tiles
 enum tile_kind
 {
     NORMAL_TILE,
@@ -24,23 +25,28 @@ enum tile_kind
     BORDER_TILE
 };
 
-enum mold_state {
+// Enum for different states of mold
+enum mold_state
+{
     PREPARE,
     SPREADING,
     DONE_SPREADING,
     FIXING
 };
 
+// Structure to represent a single tile
 struct tile_data
 {
     tile_kind kind;
 };
 
+// Structure to represent the map, which is a grid of tiles
 struct map_data
 {
     tile_data tiles[MAX_MAP_COLS][MAX_MAP_ROWS];
 };
 
+// Structure to represent the explorer, including the map and camera position
 struct explorer_data
 {
     map_data map;
@@ -48,102 +54,153 @@ struct explorer_data
     point_2d camera;
 };
 
-struct spread_data
+// Structure to represent a location on the map
+struct location_data
 {
-    int c;
-    int r;
+    int c; // Column
+    int r; // Row
 };
 
+// Structure to represent the mold and its behavior
 struct mold_data
 {
+    // Location to start spreading from
     int start_r;
     int start_c;
-    spread_data spread[MAX_MAP_COLS * MAX_MAP_ROWS];
-    long appear_at_time;
-    long last_spread_time;
-    queue<pair<int, int>> q; // Queue for BFS
-    int count;               // Counter for the number of spreads
-    long time_to_start_fix;
-    mold_state state;
 
-    // Member function to check if it's time for the mold to appear
-    bool time_to_appear(long current_time) const
-    {
-        // return !appeared && current_time == appear_at_time;
-        return current_time == appear_at_time;
-    }
+    mold_state state; // Current state of the mold
 
-    bool time_to_continue_appear(long current_time) const
+    long appear_at_time;    // Time for the mold to appear
+    long last_spread_time;  // Last time mold spread
+    long time_to_start_fix; // Time to start fixing mold
+
+    location_data spread[MAX_MAP_COLS * MAX_MAP_ROWS]; // Array to track spreads locations
+    int spreads_count;                                 // Counter for the number of spreads
+
+    queue<pair<int, int>> q; // Queue for BFS during spreading
+
+    // Check if it's time for the mold to appear
+    bool is_time_to_appear(long current_time) const
     {
         return current_time > appear_at_time;
     }
+
+    // Check if it's time for the mold to spread
+    bool is_time_to_spread(long current_time) const
+    {
+        return current_time >= last_spread_time + 1000;
+    }
 };
 
+// Initialize a location
+location_data init_loc(int c, int r)
+{
+    location_data loc;
+    loc.c = c;
+    loc.r = r;
+    return loc;
+}
+
+// Initialize mold with starting position and default values
 mold_data init_mold(int start_c, int start_r)
 {
     mold_data mold;
+
+    // Initialize location to start spreading from
     mold.start_c = start_c;
     mold.start_r = start_r;
+
+    mold.state = PREPARE; // Initialize state
+
+    mold.appear_at_time = timer_ticks(GAME_TIMER) + 1000 + rnd(0, 2000); // Random time between 1 and 3 seconds
+    mold.last_spread_time = mold.appear_at_time;                         // Initialize last spread time
+    mold.time_to_start_fix = 0;                                          // Initialize time to start fix
+
+    // Initialize the spread locations
     for (int i = 0; i < MAX_MAP_COLS * MAX_MAP_ROWS; i++)
     {
         mold.spread[i].c = -1;
         mold.spread[i].r = -1;
     }
-    mold.appear_at_time = timer_ticks(GAME_TIMER) + 2000 + rnd(0, 3000); // Random time between 2 and 5 seconds
-    mold.last_spread_time = mold.appear_at_time;                         // Initialize last spread time
-    mold.count = 0;                                                      // Initialize count
-    mold.time_to_start_fix = 0;                                          // Initialize time to start fix
-    mold.state = PREPARE;                                                 // Initialize state
+    mold.spreads_count = 0;
+
     return mold;
 }
 
-spread_data init_spread(int c, int r)
+// Function to spread mold to neighboring tiles
+void spread_mold(map_data &map, mold_data &mold)
 {
-    spread_data spread;
-    spread.c = c;
-    spread.r = r;
-    return spread;
-}
-
-void mold_spread_one(map_data &map, mold_data &mold)
-{
-
     int c = mold.q.front().first;
     int r = mold.q.front().second;
     mold.q.pop();
 
+    // Check current spot's 8-connected neighbors
     for (int i = 0; i < 8; i++)
     {
         int nc = c + DY[i];
         int nr = r + DX[i];
         if (nr >= 0 && nr < MAX_MAP_ROWS && nc >= 0 && nc < MAX_MAP_COLS)
         {
+            // Check if the neighbor is a normal tile
             if (map.tiles[nc][nr].kind == NORMAL_TILE)
             {
-                mold.spread[mold.count++] = init_spread(nc, nr);
+                mold.spread[mold.spreads_count++] = init_loc(nc, nr);
                 map.tiles[nc][nr].kind = MOLDY_TILE;
                 write_line("Mold spread to: " + to_string(nc) + ", " + to_string(nr));
                 mold.q.push({nc, nr});
+                mold.last_spread_time = timer_ticks(GAME_TIMER); // Update last spread time
             }
         }
     }
-    mold.last_spread_time = timer_ticks(GAME_TIMER); // Update last spread time
 
+    // Check if the queue is empty, indicating that mold has finished spreading
     if (mold.q.empty())
     {
         write_line("Mold spread finished.");
         mold.time_to_start_fix = timer_ticks(GAME_TIMER) + 5000; // Set time to start fix
-        mold.state = DONE_SPREADING;                           // Set state to fixing
+        mold.state = DONE_SPREADING;                             // Specify that spreading is done
     }
 }
 
-void push_first_mold(map_data &map, mold_data &mold, long current_time)
+// Handle the lifecycle of mold (appearance, spreading, fixing, breaking)
+void handle_mold_lifecycle(map_data &map, mold_data &mold)
 {
-    mold.q.push({mold.start_c, mold.start_r});
+    // Handle
+    if (mold.state == PREPARE && mold.is_time_to_appear(timer_ticks(GAME_TIMER)))
+    {
+        mold.q.push({mold.start_c, mold.start_r});
+        mold.spread[mold.spreads_count++] = init_loc(mold.start_c, mold.start_r);
+        map.tiles[mold.start_c][mold.start_r].kind = MOLDY_TILE;
+        write_line("Mold spread started at: " + to_string(mold.start_c) + ", " + to_string(mold.start_r));
+        mold.state = SPREADING; // Set state to spreading
+    }
 
-    mold.spread[mold.count++] = init_spread(mold.start_c, mold.start_r);
-    map.tiles[mold.start_c][mold.start_r].kind = MOLDY_TILE;
-    write_line("Mold spread started at: " + to_string(mold.start_c) + ", " + to_string(mold.start_r));
+    if (mold.state == SPREADING && mold.is_time_to_spread(timer_ticks(GAME_TIMER))) // Spread every second
+    {
+        spread_mold(map, mold);
+    }
+
+    // Handle fixing state of mold
+    if (mold.state == DONE_SPREADING)
+    {
+        for (int i = 0; i < mold.spreads_count; i++)
+        {
+            map.tiles[mold.spread[i].c][mold.spread[i].r].kind = FIX_TILE;
+        }
+        mold.state = FIXING; // Set state to fixing
+    }
+
+    // Handle broken state of mold
+    if (timer_ticks(GAME_TIMER) > mold.time_to_start_fix)
+    {
+        for (int i = 0; i < mold.spreads_count; i++)
+        {
+            if (map.tiles[mold.spread[i].c][mold.spread[i].r].kind == FIX_TILE)
+            {
+                map.tiles[mold.spread[i].c][mold.spread[i].r].kind = BROKEN_TILE;
+            }
+        }
+    }
 }
 
 // Function to initialize the map with normal tiles
@@ -166,6 +223,7 @@ void init_explorer(explorer_data &explorer)
     explorer.camera = point_at(0, 0);
 }
 
+// Get the color corresponding to a tile kind
 color color_for_tile_kind(tile_kind kind)
 {
     switch (kind)
@@ -185,11 +243,13 @@ color color_for_tile_kind(tile_kind kind)
     }
 }
 
+// Draw a single tile at a specific position
 void draw_tile(tile_data tile, int x, int y)
 {
     fill_rectangle(color_for_tile_kind(tile.kind), x, y, TILE_WIDTH, TILE_HEIGHT);
 }
 
+// Draw the entire map based on the camera position
 void draw_map(map_data &map, const point_2d &camera)
 {
     int start_col = camera.x / TILE_WIDTH;
@@ -211,6 +271,7 @@ void draw_map(map_data &map, const point_2d &camera)
     }
 }
 
+// Draw the explorer and the map
 void draw_explorer(explorer_data &explorer)
 {
     set_camera_position(explorer.camera);
@@ -218,19 +279,17 @@ void draw_explorer(explorer_data &explorer)
     clear_screen(color_white());
 
     draw_map(explorer.map, explorer.camera);
+    
+    draw_rectangle(color_black(), explorer.camera.x, explorer.camera.y + 10, 50, 50);
+    fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
+    draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
 
-    fill_rectangle(color_white(), 0, 0, TILE_WIDTH + 10, TILE_HEIGHT + 25);
-    fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), 5, 20, TILE_WIDTH, TILE_HEIGHT);
-
-    draw_text("Editor", color_black(), 0, 10);
-    draw_text("Kind: " + to_string(((int)explorer.editor_tile_kind) + 1), color_black(), 0, 30);
-
-    // // Draw text for the camera position
-    // draw_text("Camera: " + to_string(explorer.camera.x) + ", " + to_string(explorer.camera.y), color_black(), 0, 60);
+    draw_text("Editor", color_black(), explorer.camera.x, explorer.camera.y + 10);
 
     refresh_screen();
 }
 
+// Handle input for editing the map
 void handle_editor_input(explorer_data &explorer)
 {
     if (key_typed(NUM_1_KEY))
@@ -250,7 +309,6 @@ void handle_editor_input(explorer_data &explorer)
 
         if (c >= 0 && c < MAX_MAP_COLS && r >= 0 && r < MAX_MAP_ROWS)
         {
-
             if (explorer.editor_tile_kind == NORMAL_TILE)
             {
                 if (explorer.map.tiles[c][r].kind == FIX_TILE || explorer.map.tiles[c][r].kind == BORDER_TILE)
@@ -270,6 +328,7 @@ void handle_editor_input(explorer_data &explorer)
     }
 }
 
+// Handle general input for the explorer
 void handle_input(explorer_data &explorer)
 {
     handle_editor_input(explorer);
@@ -292,6 +351,7 @@ void handle_input(explorer_data &explorer)
     }
 }
 
+// Main function to run the game
 int main()
 {
     explorer_data explorer;
@@ -306,51 +366,13 @@ int main()
 
     create_timer(GAME_TIMER);
     start_timer(GAME_TIMER);
+
     while (!quit_requested())
     {
         handle_input(explorer);
 
-        if (mold.time_to_appear(timer_ticks(GAME_TIMER)))
-        {
-            
-        }
-        else if (mold.time_to_continue_appear(timer_ticks(GAME_TIMER)))
-        {
-            if (mold.state == PREPARE)
-            {
-                push_first_mold(explorer.map, mold, timer_ticks(GAME_TIMER));
-                mold.state = SPREADING; // Set state to spreading
+        handle_mold_lifecycle(explorer.map, mold);
 
-            }
-            if (!mold.q.empty() && (mold.last_spread_time + 1000 <= timer_ticks(GAME_TIMER))) // Spread every second
-            {
-
-                mold_spread_one(explorer.map, mold);
-            }
-        }
-        if (mold.q.empty())
-        {
-            if (mold.state == DONE_SPREADING)
-            {
-                for (int i = 0; i < mold.count; i++)
-                {
-                    explorer.map.tiles[mold.spread[i].c][mold.spread[i].r].kind = FIX_TILE;
-                }
-                mold.state = FIXING; // Set state to fixing
-            }
-
-            if (timer_ticks(GAME_TIMER) > mold.time_to_start_fix)
-            {
-                write_line("Time passed");
-                for (int i = 0; i < mold.count; i++)
-                {
-                    if (explorer.map.tiles[mold.spread[i].c][mold.spread[i].r].kind == FIX_TILE)
-                    {
-                        explorer.map.tiles[mold.spread[i].c][mold.spread[i].r].kind = BROKEN_TILE;
-                    }
-                }
-            }
-        }
         draw_explorer(explorer);
 
         process_events();
