@@ -5,6 +5,10 @@ using namespace std;
 
 using std::to_string;
 
+// TODO: Check if the border tile has taken up more than 50% of remaining normal tiles. If so, pause the game and tell the user to remove some border tiles.
+// TODO: Display the percentage of broken tiles on the screen.
+//
+
 // Constants for map dimensions and tile sizes
 const int MAX_MAP_ROWS = 50;
 const int MAX_MAP_COLS = 50;
@@ -185,7 +189,7 @@ void handle_mold_lifecycle(map_data &map, mold_data &mold)
         mold.spread[mold.spreads_count++] = init_loc(mold.start_c, mold.start_r);
         map.tiles[mold.start_c][mold.start_r].kind = MOLDY_TILE;
         mold.last_spread_time = timer_ticks(GAME_TIMER); // Set the appear_at_time to the current time + 1 second
-        mold.state = SPREADING; // Set state to spreading
+        mold.state = SPREADING;                          // Set state to spreading
     }
 
     if (mold.state == SPREADING && mold.is_time_to_spread(timer_ticks(GAME_TIMER))) // Spread every second
@@ -227,6 +231,36 @@ void init_map(map_data &map)
             map.tiles[i][j].kind = NORMAL_TILE;
         }
     }
+}
+
+bool is_space_available(map_data &map)
+{
+    for (int i = 0; i < MAX_MAP_COLS; i++)
+    {
+        for (int j = 0; j < MAX_MAP_ROWS; j++)
+        {
+            if (map.tiles[i][j].kind == NORMAL_TILE)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool is_game_over(map_data &map)
+{
+    for (int i = 0; i < MAX_MAP_COLS; i++)
+    {
+        for (int j = 0; j < MAX_MAP_ROWS; j++)
+        {
+            if (map.tiles[i][j].kind != BROKEN_TILE)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 // Function to initialize the explorer data
@@ -385,28 +419,38 @@ int main()
 
     while (!quit_requested())
     {
+        if (is_game_over(explorer.map))
+        {
+            write_line("Game Over! All tiles are broken.");
+            break;
+        }
         handle_input(explorer);
 
         int start_c, start_r;
-        if (molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
+
+        if (is_space_available(explorer.map))
         {
-            write_line("New mold appeared!");
-
-            do
+            if (molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
             {
-                start_c = rnd(0, MAX_MAP_COLS - 1);
-                start_r = rnd(0, MAX_MAP_ROWS - 1);
-                write_line("New mold position: " + to_string(start_c) + ", " + to_string(start_r));
-            } while (explorer.map.tiles[start_c][start_r].kind != NORMAL_TILE);
+                write_line("New mold appeared!");
 
-            mold_data new_mold = init_mold(start_c, start_r); // Initialize new mold
-            molds.v.push_back(new_mold); // Add new mold to the vector
+                do
+                {
+                    start_c = rnd(0, MAX_MAP_COLS - 1);
+                    start_r = rnd(0, MAX_MAP_ROWS - 1);
+                    write_line("New mold position: " + to_string(start_c) + ", " + to_string(start_r));
+                } while (explorer.map.tiles[start_c][start_r].kind != NORMAL_TILE);
 
-            molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 + rnd(0, 2000); // Set time for next mold appearance
+                mold_data new_mold = init_mold(start_c, start_r); // Initialize new mold
+                molds.v.push_back(new_mold);                      // Add new mold to the vector
+
+                molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 1000 + rnd(0, 2000); // Set time for next mold appearance
+            }
         }
 
         // Update all molds
-        if (!molds.v.empty()) {
+        if (!molds.v.empty())
+        {
             for (int i = 0; i < molds.v.size(); i++)
             {
                 // Handle mold lifecycle
