@@ -117,6 +117,10 @@ struct game_data
     {
         return current_time > last_update_dif_time + GAME_UPDATE_INTERVAL;
     }
+    bool is_game_over()
+{
+    return (broken_proportion + border_proportion) >= 80.0;
+}
 };
 
 // Initialize a location
@@ -300,27 +304,16 @@ void update_game(game_data &game, const map_data &map)
         }
     }
 
-    game.broken_proportion = static_cast<double>(broken_tiles) * 100 / (normal_tiles + broken_tiles);
-    game.border_proportion = static_cast<double>(border_tiles) * 100 / (normal_tiles + border_tiles);
+    game.broken_proportion = static_cast<double>(broken_tiles) * 100 / (MAX_MAP_COLS * MAX_MAP_ROWS);
+    game.border_proportion = static_cast<double>(border_tiles) * 100 / (MAX_MAP_COLS * MAX_MAP_ROWS);
+
+    
     // write_line("Broken proportion: " + to_string(game.broken_proportion));
     // write_line("Border proportion: " + to_string(game.border_proportion));
 }
 
 // Function to check if the game is over (all tiles are broken or blocked by border tiles)
-bool is_game_over(map_data &map)
-{
-    for (int i = 0; i < MAX_MAP_COLS; i++)
-    {
-        for (int j = 0; j < MAX_MAP_ROWS; j++)
-        {
-            if (map.tiles[i][j].kind != BROKEN_TILE && map.tiles[i][j].kind != BORDER_TILE)
-            {
-                return false;
-            }
-        }
-    }
-    return true;
-}
+
 
 // Function to initialize the explorer data
 void init_explorer(explorer_data &explorer)
@@ -393,8 +386,7 @@ void draw_explorer(const explorer_data &explorer, const game_data &game)
 
     draw_text("Editor", color_black(), explorer.camera.x, explorer.camera.y + 10);
 
-    draw_text("Broken tiles proportion: " + to_string(game.broken_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 70);
-    draw_text("Border tiles proportion: " + to_string(game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 90);
+    draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 70);
 
     if (game.border_proportion > 50)
     {
@@ -488,7 +480,7 @@ int main()
 
     while (!quit_requested())
     {
-        if (is_game_over(explorer.map))
+        if (game.is_game_over())
         {
             write_line("Game Over! All tiles are broken.");
             write_line("You survived for " + to_string(timer_ticks(GAME_TIMER) / 1000) + " seconds.");
