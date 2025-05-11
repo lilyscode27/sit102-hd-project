@@ -12,11 +12,12 @@ using std::to_string;
 // Constants for map dimensions and tile sizes
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
-const int MAX_MAP_ROWS = 50;
-const int MAX_MAP_COLS = 50;
-const int TILE_WIDTH = 10;
-const int TILE_HEIGHT = 10;
+const int MAX_MAP_ROWS = 40;
+const int MAX_MAP_COLS = 40;
+const int TILE_WIDTH = 30;
+const int TILE_HEIGHT = 30;
 const string GAME_TIMER = "Game Timer";
+const long GAME_UPDATE_INTERVAL = 20000; // Interval for game updates in milliseconds
 
 // Directions for 8-connected neighbors (up, down, left, right, and diagonals)
 const int DX[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
@@ -105,6 +106,19 @@ struct molds_data
     }
 };
 
+struct game_data
+{
+    double broken_proportion;
+    double border_proportion;
+    long last_update_dif_time;
+    double mold_appearance_speed;
+
+    bool is_time_to_update(long current_time) const
+    {
+        return current_time > last_update_dif_time + GAME_UPDATE_INTERVAL;
+    }
+};
+
 // Initialize a location
 location_data init_loc(int c, int r)
 {
@@ -147,6 +161,16 @@ molds_data init_molds()
     return molds;
 }
 
+game_data init_game()
+{
+    game_data game;
+    game.broken_proportion = 0.0;
+    game.border_proportion = 0.0;
+    game.last_update_dif_time = 0;
+    game.mold_appearance_speed = 1;
+    return game;
+}
+
 // Function to spread mold to neighboring tiles
 void spread_mold(map_data &map, mold_data &mold)
 {
@@ -166,7 +190,7 @@ void spread_mold(map_data &map, mold_data &mold)
             {
                 mold.spread[mold.spreads_count++] = init_loc(nc, nr);
                 map.tiles[nc][nr].kind = MOLDY_TILE;
-                write_line("Mold spread to: " + to_string(nc) + ", " + to_string(nr));
+                //write_line("Mold spread to: " + to_string(nc) + ", " + to_string(nr));
                 mold.q.push({nc, nr});
                 mold.last_spread_time = timer_ticks(GAME_TIMER); // Update last spread time
             }
@@ -176,7 +200,7 @@ void spread_mold(map_data &map, mold_data &mold)
     // Check if the queue is empty, indicating that mold has finished spreading
     if (mold.q.empty())
     {
-        write_line("Mold spread finished.");
+        //write_line("Mold spread finished.");
         mold.time_to_start_fix = timer_ticks(GAME_TIMER) + 5000; // Set time to start fix
         mold.state = DONE_SPREADING;                             // Specify that spreading is done
     }
@@ -249,6 +273,37 @@ bool is_space_available(map_data &map)
         }
     }
     return false;
+}
+
+void update_game(game_data &game, const map_data &map)
+{
+    int normal_tiles = 0;
+    int broken_tiles = 0;
+    int border_tiles = 0;
+
+    for (int i = 0; i < MAX_MAP_COLS; i++)
+    {
+        for (int j = 0; j < MAX_MAP_ROWS; j++)
+        {
+            if (map.tiles[i][j].kind == NORMAL_TILE)
+            {
+                normal_tiles++;
+            }
+            else if (map.tiles[i][j].kind == BROKEN_TILE)
+            {
+                broken_tiles++;
+            }
+            else if (map.tiles[i][j].kind == BORDER_TILE)
+            {
+                border_tiles++;
+            }
+        }
+    }
+
+    game.broken_proportion = static_cast<double>(broken_tiles) * 100 / (normal_tiles + broken_tiles);
+    game.border_proportion = static_cast<double>(border_tiles) * 100 / (normal_tiles + border_tiles);
+    // write_line("Broken proportion: " + to_string(game.broken_proportion));
+    // write_line("Border proportion: " + to_string(game.border_proportion));
 }
 
 // Function to check if the game is over (all tiles are broken or blocked by border tiles)
@@ -324,7 +379,7 @@ void draw_map(const map_data &map, const point_2d &camera)
 }
 
 // Draw the explorer and the map
-void draw_explorer(const explorer_data &explorer)
+void draw_explorer(const explorer_data &explorer, const game_data &game)
 {
     set_camera_position(explorer.camera);
 
@@ -338,7 +393,13 @@ void draw_explorer(const explorer_data &explorer)
 
     draw_text("Editor", color_black(), explorer.camera.x, explorer.camera.y + 10);
 
-    draw_interface();
+    draw_text("Broken tiles proportion: " + to_string(game.broken_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 70);
+    draw_text("Border tiles proportion: " + to_string(game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 90);
+
+    if (game.border_proportion > 50)
+    {
+        draw_text("Warning: Too many border tiles!", color_red(), explorer.camera.x, explorer.camera.y + 110);
+    }
 
     refresh_screen();
 }
@@ -389,19 +450,19 @@ void handle_input(explorer_data &explorer)
 
     if (key_down(LEFT_KEY))
     {
-        explorer.camera.x -= 1;
+        explorer.camera.x -= 2;
     }
     if (key_down(RIGHT_KEY))
     {
-        explorer.camera.x += 1;
+        explorer.camera.x += 2;
     }
     if (key_down(UP_KEY))
     {
-        explorer.camera.y -= 1;
+        explorer.camera.y -= 2;
     }
     if (key_down(DOWN_KEY))
     {
-        explorer.camera.y += 1;
+        explorer.camera.y += 2;
     }
 }
 
@@ -420,6 +481,8 @@ int main()
 
     open_window("Map Explorer", WINDOW_WIDTH, WINDOW_HEIGHT);
 
+    game_data game = init_game();
+
     create_timer(GAME_TIMER);
     start_timer(GAME_TIMER);
 
@@ -428,6 +491,7 @@ int main()
         if (is_game_over(explorer.map))
         {
             write_line("Game Over! All tiles are broken.");
+            write_line("You survived for " + to_string(timer_ticks(GAME_TIMER) / 1000) + " seconds.");
             break;
         }
         handle_input(explorer);
@@ -438,19 +502,19 @@ int main()
         {
             if (molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
             {
-                write_line("New mold appeared!");
+                //write_line("New mold appeared!");
 
                 do
                 {
                     start_c = rnd(0, MAX_MAP_COLS - 1);
                     start_r = rnd(0, MAX_MAP_ROWS - 1);
-                    write_line("New mold position: " + to_string(start_c) + ", " + to_string(start_r));
+                    //write_line("New mold position: " + to_string(start_c) + ", " + to_string(start_r));
                 } while (explorer.map.tiles[start_c][start_r].kind != NORMAL_TILE);
 
                 mold_data new_mold = init_mold(start_c, start_r); // Initialize new mold
                 molds.v.push_back(new_mold);                      // Add new mold to the vector
 
-                molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 1000 + rnd(0, 2000); // Set time for next mold appearance
+                molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 * game.mold_appearance_speed + rnd(0, 2000); // Set time for next mold appearance
             }
         }
 
@@ -466,13 +530,27 @@ int main()
                 if (molds.v[i].state == BROKEN)
                 {
                     molds.v.erase(molds.v.begin() + i); // Remove finished mold
-                    write_line("Mold lifecycle finished.");
+                    // write_line("Mold lifecycle finished.");
                     i--; // Adjust index after erasing
                 }
             }
         }
 
-        draw_explorer(explorer);
+        // Update game state
+        update_game(game, explorer.map);
+
+        // Check if it's time to update the game
+        if (game.is_time_to_update(timer_ticks(GAME_TIMER)))
+        {
+            if (game.mold_appearance_speed - 0.1 > 0)
+            {
+                game.mold_appearance_speed -= 0.1;
+                game.last_update_dif_time = timer_ticks(GAME_TIMER);
+                write_line("Mold appearance speed increased: " + to_string(game.mold_appearance_speed));
+            }
+        }
+
+        draw_explorer(explorer, game);
 
         process_events();
     }
