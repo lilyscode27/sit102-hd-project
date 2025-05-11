@@ -10,6 +10,8 @@ using std::to_string;
 //
 
 // Constants for map dimensions and tile sizes
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 600;
 const int MAX_MAP_ROWS = 50;
 const int MAX_MAP_COLS = 50;
 const int TILE_WIDTH = 10;
@@ -233,6 +235,7 @@ void init_map(map_data &map)
     }
 }
 
+// Function to check if there is space available for mold to spread
 bool is_space_available(map_data &map)
 {
     for (int i = 0; i < MAX_MAP_COLS; i++)
@@ -248,13 +251,14 @@ bool is_space_available(map_data &map)
     return false;
 }
 
+// Function to check if the game is over (all tiles are broken or blocked by border tiles)
 bool is_game_over(map_data &map)
 {
     for (int i = 0; i < MAX_MAP_COLS; i++)
     {
         for (int j = 0; j < MAX_MAP_ROWS; j++)
         {
-            if (map.tiles[i][j].kind != BROKEN_TILE)
+            if (map.tiles[i][j].kind != BROKEN_TILE && map.tiles[i][j].kind != BORDER_TILE)
             {
                 return false;
             }
@@ -298,7 +302,7 @@ void draw_tile(tile_data tile, int x, int y)
 }
 
 // Draw the entire map based on the camera position
-void draw_map(map_data &map, const point_2d &camera)
+void draw_map(const map_data &map, const point_2d &camera)
 {
     int start_col = camera.x / TILE_WIDTH;
     int end_col = (camera.x + screen_width()) / TILE_WIDTH + 1;
@@ -320,7 +324,7 @@ void draw_map(map_data &map, const point_2d &camera)
 }
 
 // Draw the explorer and the map
-void draw_explorer(explorer_data &explorer)
+void draw_explorer(const explorer_data &explorer)
 {
     set_camera_position(explorer.camera);
 
@@ -333,6 +337,8 @@ void draw_explorer(explorer_data &explorer)
     draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
 
     draw_text("Editor", color_black(), explorer.camera.x, explorer.camera.y + 10);
+
+    draw_interface();
 
     refresh_screen();
 }
@@ -412,7 +418,7 @@ int main()
 
     molds_data molds;
 
-    open_window("Map Explorer", 800, 600);
+    open_window("Map Explorer", WINDOW_WIDTH, WINDOW_HEIGHT);
 
     create_timer(GAME_TIMER);
     start_timer(GAME_TIMER);
