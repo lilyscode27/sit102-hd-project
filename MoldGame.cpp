@@ -145,6 +145,7 @@ struct game_data
     double broken_proportion;     // Proportion of broken tiles
     double border_proportion;     // Proportion of border tiles
     long last_update_dif_time;    // Last time the game difficulty was updated
+    molds_data molds;           // Data for the molds
     double mold_appearance_speed; // Speed of mold appearance
     game_state state;             // Current state of the game
     int score;                    // Score of the game
@@ -218,6 +219,7 @@ game_data init_game()
     game.broken_proportion = 0.0;
     game.border_proportion = 0.0;
     game.last_update_dif_time = 0;
+    game.molds = init_molds(); // Initialize molds data
     game.mold_appearance_speed = 1;
     game.state = PREPARE_GAME;
     game.score = 0;
@@ -458,7 +460,7 @@ void prepare_interface(game_data &game)
 }
 
 // Function to draw the playing interface
-void playing_interface(const explorer_data &explorer, game_data &game, molds_data &molds)
+void playing_interface(const explorer_data &explorer, game_data &game)
 {
     set_camera_position(explorer.camera);
 
@@ -467,28 +469,28 @@ void playing_interface(const explorer_data &explorer, game_data &game, molds_dat
     draw_map(explorer.map, explorer.camera);
 
     // Draw the attention icon for molds that are off the visible map
-    for (int i = 0; i < molds.v.size(); i++)
+    for (int i = 0; i < game.molds.v.size(); i++)
     {
-        if (molds.v[i].state == SPREADING)
+        if (game.molds.v[i].state == SPREADING)
         {
-            if (molds.v[i].state == SPREADING)
+            if (game.molds.v[i].state == SPREADING)
             {
-                string tile_visibility = is_mold_visible(molds.v[i].start_c, molds.v[i].start_r, explorer.camera);
+                string tile_visibility = is_mold_visible(game.molds.v[i].start_c, game.molds.v[i].start_r, explorer.camera);
                 if (tile_visibility == "Left")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x, explorer.camera.y + molds.v[i].start_r * TILE_HEIGHT);
+                    draw_bitmap(attention_icon, explorer.camera.x, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
                 }
                 else if (tile_visibility == "Right")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + molds.v[i].start_r * TILE_HEIGHT);
+                    draw_bitmap(attention_icon, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
                 }
                 else if (tile_visibility == "Top")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x + molds.v[i].start_c * TILE_WIDTH, explorer.camera.y);
+                    draw_bitmap(attention_icon, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y);
                 }
                 else if (tile_visibility == "Bottom")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x + molds.v[i].start_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
+                    draw_bitmap(attention_icon, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
                 }
             }
         }
@@ -539,7 +541,7 @@ void game_over_interface(explorer_data explorer, game_data &game)
 }
 
 // Function to draw the corresponding interface based on the game state
-void draw_explorer(const explorer_data &explorer, game_data &game, molds_data &molds, game_effect_data &game_effect)
+void draw_explorer(const explorer_data &explorer, game_data &game, game_effect_data &game_effect)
 {
 
     switch (game.state)
@@ -548,7 +550,7 @@ void draw_explorer(const explorer_data &explorer, game_data &game, molds_data &m
         prepare_interface(game);
         break;
     case PLAYING:
-        playing_interface(explorer, game, molds);
+        playing_interface(explorer, game);
         break;
     case PAUSING:
         pausing_interface(game);
@@ -674,7 +676,6 @@ int main()
     explorer_data explorer;
     game_data game = init_game();
     game_effect_data game_effect = init_game_effect();
-    molds_data molds;
 
     open_window("Moldbound", WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -689,14 +690,13 @@ int main()
         }
 
         process_events();
-        draw_explorer(explorer, game, molds, game_effect);
+        draw_explorer(explorer, game, game_effect);
 
         // Handle the prepare game state
         if (game.state == PREPARE_GAME)
         {
             init_explorer(explorer);
             game = init_game();
-            molds = init_molds();
         }
 
         // Handle the playing state
@@ -715,7 +715,7 @@ int main()
             // Check if there is space available for mold to spread
             if (is_space_available(explorer.map))
             {
-                if (molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
+                if (game.molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
                 {
                     int start_c, start_r;
                     do
@@ -725,24 +725,24 @@ int main()
                     } while (explorer.map.tiles[start_c][start_r].kind != NORMAL_TILE);
 
                     mold_data new_mold = init_mold(start_c, start_r); // Initialize new mold
-                    molds.v.push_back(new_mold);                      // Add new mold to the vector
+                    game.molds.v.push_back(new_mold);                      // Add new mold to the vector
 
-                    molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 * game.mold_appearance_speed + rnd(0, 2000); // Set time for next mold appearance
+                    game.molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 * game.mold_appearance_speed + rnd(0, 2000); // Set time for next mold appearance
                 }
             }
 
             // Update current molds
-            if (!molds.v.empty())
+            if (!game.molds.v.empty())
             {
-                for (int i = 0; i < molds.v.size(); i++)
+                for (int i = 0; i < game.molds.v.size(); i++)
                 {
                     // Handle mold lifecycle
-                    handle_mold_lifecycle(explorer.map, molds.v[i]);
+                    handle_mold_lifecycle(explorer.map, game.molds.v[i]);
 
                     // Check if mold lifecycle is finished
-                    if (molds.v[i].state == BROKEN)
+                    if (game.molds.v[i].state == BROKEN)
                     {
-                        molds.v.erase(molds.v.begin() + i); // Remove finished mold
+                        game.molds.v.erase(game.molds.v.begin() + i); // Remove finished mold
                         i--;                                // Adjust index after erasing
                     }
                 }
