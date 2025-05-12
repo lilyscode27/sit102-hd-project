@@ -23,6 +23,7 @@ const sound_effect drawing_sound = load_sound_effect("Drawing Sound", "drawing-s
 const bitmap pause_icon = load_bitmap("Pause Button", "pause.png");
 const bitmap sound_on_icon = load_bitmap("Sound On", "sound-on.png");
 const bitmap sound_off_icon = load_bitmap("Sound Off", "sound-off.png");
+const bitmap attention_icon = load_bitmap("Attention Icon", "attention.png");
 const double MUSIC_VOLUME = 0.3;
 
 // Constants for the game
@@ -132,6 +133,12 @@ struct molds_data
     }
 };
 
+struct attention_data
+{
+    location_data loc; // Location of the attention icon
+    bool is_visible;   // Flag to indicate if the attention icon is visible
+};
+
 // Structure to represent the current game data
 struct game_data
 {
@@ -155,8 +162,14 @@ struct game_data
     }
 };
 
+struct game_effect_data
+{
+    bool is_sound_on; // Flag to indicate if sound is on
+};
+
 // Function to initialize a location
-location_data init_loc(int c, int r)
+location_data
+init_loc(int c, int r)
 {
     location_data loc;
     loc.c = c;
@@ -209,6 +222,13 @@ game_data init_game()
     game.state = PREPARE_GAME;
     game.score = 0;
     return game;
+}
+
+game_effect_data init_game_effect()
+{
+    game_effect_data game_effect;
+    game_effect.is_sound_on = true; // Initialize sound state
+    return game_effect;
 }
 
 // Function to spread mold to neighboring tiles
@@ -377,6 +397,28 @@ void draw_tile(tile_data tile, int x, int y)
     fill_rectangle(color_for_tile_kind(tile.kind), x, y, TILE_WIDTH, TILE_HEIGHT);
 }
 
+// Function to determine whether a mold is off the visible map
+string is_mold_visible(int col, int row, const point_2d &camera)
+{
+    // Calculate the visible range of columns and rows
+    int start_col = camera.x / TILE_WIDTH;
+    int end_col = (camera.x + screen_width()) / TILE_WIDTH;
+    int start_row = camera.y / TILE_HEIGHT;
+    int end_row = (camera.y + screen_height()) / TILE_HEIGHT;
+
+    // Determine the relative position of the mold
+    if (col < start_col)
+        return "Left";
+    else if (col > end_col)
+        return "Right";
+    else if (row < start_row)
+        return "Top";
+    else if (row > end_row)
+        return "Bottom";
+    else
+        return "Visible";
+}
+
 // Function to draw the entire map based on the camera position
 void draw_map(const map_data &map, const point_2d &camera)
 {
@@ -416,7 +458,7 @@ void prepare_interface(game_data &game)
 }
 
 // Function to draw the playing interface
-void playing_interface(const explorer_data &explorer, game_data &game)
+void playing_interface(const explorer_data &explorer, game_data &game, molds_data &molds)
 {
     set_camera_position(explorer.camera);
 
@@ -424,20 +466,42 @@ void playing_interface(const explorer_data &explorer, game_data &game)
 
     draw_map(explorer.map, explorer.camera);
 
+    // Draw the attention icon for molds that are off the visible map
+    for (int i = 0; i < molds.v.size(); i++)
+    {
+        if (molds.v[i].state == SPREADING)
+        {
+            if (molds.v[i].state == SPREADING)
+            {
+                string tile_visibility = is_mold_visible(molds.v[i].start_c, molds.v[i].start_r, explorer.camera);
+                if (tile_visibility == "Left")
+                {
+                    draw_bitmap(attention_icon, explorer.camera.x, explorer.camera.y + molds.v[i].start_r * TILE_HEIGHT);
+                }
+                else if (tile_visibility == "Right")
+                {
+                    draw_bitmap(attention_icon, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + molds.v[i].start_r * TILE_HEIGHT);
+                }
+                else if (tile_visibility == "Top")
+                {
+                    draw_bitmap(attention_icon, explorer.camera.x + molds.v[i].start_c * TILE_WIDTH, explorer.camera.y);
+                }
+                else if (tile_visibility == "Bottom")
+                {
+                    draw_bitmap(attention_icon, explorer.camera.x + molds.v[i].start_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
+                }
+            }
+        }
+    }
+
+    // Draw the editor to change tile kind
     draw_rectangle(color_black(), explorer.camera.x, explorer.camera.y + 10, 50, 50);
     fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
     draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
-
     draw_text("Editor: Enter 1 for BORDER_TILE, 2 for NORMAL_TILE", color_black(), explorer.camera.x, explorer.camera.y + 10);
 
     draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 70);
 
-    // if (bitmap_button(pause_icon, rectangle_from(WINDOW_WIDTH - 62, 0, 50, 50)))
-    // {
-    //     write_line("Game paused");
-    //     game.state = PAUSING;
-    //     pause_timer(GAME_TIMER);
-    // }
     if (button("Pause Game", rectangle_from(WINDOW_WIDTH - BUTTON_WIDTH, 0, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.state = PAUSING;
@@ -466,7 +530,6 @@ void game_over_interface(explorer_data explorer, game_data &game)
     draw_text("You survived for " + to_string(game.score) + " seconds.", color_red(), explorer.camera.x, explorer.camera.y + 130);
     if (button("Back to Home", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + 40, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
-        // clear_screen(color_white());
         game.state = PREPARE_GAME;
     }
     if (button("Exit Program", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + 40 + BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT)))
@@ -476,7 +539,7 @@ void game_over_interface(explorer_data explorer, game_data &game)
 }
 
 // Function to draw the corresponding interface based on the game state
-void draw_explorer(const explorer_data &explorer, game_data &game)
+void draw_explorer(const explorer_data &explorer, game_data &game, molds_data &molds, game_effect_data &game_effect)
 {
 
     switch (game.state)
@@ -485,7 +548,7 @@ void draw_explorer(const explorer_data &explorer, game_data &game)
         prepare_interface(game);
         break;
     case PLAYING:
-        playing_interface(explorer, game);
+        playing_interface(explorer, game, molds);
         break;
     case PAUSING:
         pausing_interface(game);
@@ -497,6 +560,7 @@ void draw_explorer(const explorer_data &explorer, game_data &game)
         break;
     }
 
+    // Draw the sound button
     bitmap sound_state;
     if (music_volume() == 0)
     {
@@ -512,10 +576,12 @@ void draw_explorer(const explorer_data &explorer, game_data &game)
         if (music_volume() == 0)
         {
             set_music_volume(MUSIC_VOLUME);
+            game_effect.is_sound_on = true;
         }
         else
         {
             set_music_volume(0);
+            game_effect.is_sound_on = false;
         }
     }
 
@@ -524,7 +590,7 @@ void draw_explorer(const explorer_data &explorer, game_data &game)
 }
 
 // Function to handle input for editing the map
-void handle_editor_input(explorer_data &explorer)
+void handle_editor_input(explorer_data &explorer, game_effect_data &game_effect)
 {
     if (key_typed(NUM_1_KEY))
     {
@@ -544,9 +610,13 @@ void handle_editor_input(explorer_data &explorer)
 
         if (c >= 0 && c < MAX_MAP_COLS && r >= 0 && r < MAX_MAP_ROWS)
         {
+
             if (!sound_effect_playing("Drawing Sound"))
             {
-                play_sound_effect("Drawing Sound");
+                if (game_effect.is_sound_on)
+                {
+                    play_sound_effect("Drawing Sound");
+                }
             }
 
             if (explorer.editor_tile_kind == NORMAL_TILE)
@@ -573,9 +643,9 @@ void handle_editor_input(explorer_data &explorer)
 }
 
 // Function to handle general input for the explorer
-void handle_input(explorer_data &explorer)
+void handle_input(explorer_data &explorer, game_effect_data &game_effect)
 {
-    handle_editor_input(explorer);
+    handle_editor_input(explorer, game_effect);
 
     if (key_down(LEFT_KEY))
     {
@@ -603,6 +673,7 @@ int main()
 
     explorer_data explorer;
     game_data game = init_game();
+    game_effect_data game_effect = init_game_effect();
     molds_data molds;
 
     open_window("Moldbound", WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -618,7 +689,7 @@ int main()
         }
 
         process_events();
-        draw_explorer(explorer, game);
+        draw_explorer(explorer, game, molds, game_effect);
 
         // Handle the prepare game state
         if (game.state == PREPARE_GAME)
@@ -632,7 +703,7 @@ int main()
         if (game.state == PLAYING)
         {
             // Handle player input
-            handle_input(explorer);
+            handle_input(explorer, game_effect);
 
             // Check if the game is over
             if (game.is_game_over())
