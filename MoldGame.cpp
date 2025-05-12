@@ -5,6 +5,10 @@ using namespace std;
 
 using std::to_string;
 
+// TODO: Beautify the interface
+// TODO: Store the score in a file
+// TODO: Add markers to show molds that are off the visible screen
+
 // Constants for window size and map dimensions
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
@@ -12,6 +16,14 @@ const int MAX_MAP_ROWS = 40;
 const int MAX_MAP_COLS = 40;
 const int TILE_WIDTH = 30;
 const int TILE_HEIGHT = 30;
+
+// Constants for the game resources
+const music game_music = load_music("Game Music", "game-music.mp3");
+const sound_effect drawing_sound = load_sound_effect("Drawing Sound", "drawing-sound.mp3");
+const bitmap pause_icon = load_bitmap("Pause Button", "pause.png");
+const bitmap sound_on_icon = load_bitmap("Sound On", "sound-on.png");
+const bitmap sound_off_icon = load_bitmap("Sound Off", "sound-off.png");
+const double MUSIC_VOLUME = 0.3;
 
 // Constants for the game
 const string GAME_TIMER = "Game Timer";
@@ -87,7 +99,7 @@ struct mold_data
     // // Location to start spreading from
     int start_c;
     int start_r;
-    //location_data start_loc; // Start location of the mold
+    // location_data start_loc; // Start location of the mold
 
     mold_state state; // Current state of the mold
 
@@ -110,7 +122,7 @@ struct mold_data
 // Structure to represent multiple molds data
 struct molds_data
 {
-    vector<mold_data> v; // Vector to store current molds
+    vector<mold_data> v;      // Vector to store current molds
     long time_to_appear_next; // Time for the next mold to appear
 
     // Check if it's time for the next mold to appear
@@ -123,15 +135,15 @@ struct molds_data
 // Structure to represent the current game data
 struct game_data
 {
-    double broken_proportion; // Proportion of broken tiles
-    double border_proportion; // Proportion of border tiles
-    long last_update_dif_time; // Last time the game difficulty was updated
+    double broken_proportion;     // Proportion of broken tiles
+    double border_proportion;     // Proportion of border tiles
+    long last_update_dif_time;    // Last time the game difficulty was updated
     double mold_appearance_speed; // Speed of mold appearance
-    game_state state; // Current state of the game
-    int score; // Score of the game
+    game_state state;             // Current state of the game
+    int score;                    // Score of the game
 
     // Check if it's time to update the game difficulty
-    bool is_time_to_update(long current_time) const
+    bool is_time_to_update_dif(long current_time) const
     {
         return current_time > last_update_dif_time + GAME_UPDATE_INTERVAL;
     }
@@ -420,7 +432,13 @@ void playing_interface(const explorer_data &explorer, game_data &game)
 
     draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 70);
 
-    if (button("Pause Game", rectangle_from(WINDOW_WIDTH - 100, 0, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    // if (bitmap_button(pause_icon, rectangle_from(WINDOW_WIDTH - 62, 0, 50, 50)))
+    // {
+    //     write_line("Game paused");
+    //     game.state = PAUSING;
+    //     pause_timer(GAME_TIMER);
+    // }
+    if (button("Pause Game", rectangle_from(WINDOW_WIDTH - BUTTON_WIDTH, 0, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.state = PAUSING;
         pause_timer(GAME_TIMER);
@@ -448,7 +466,7 @@ void game_over_interface(explorer_data explorer, game_data &game)
     draw_text("You survived for " + to_string(game.score) + " seconds.", color_red(), explorer.camera.x, explorer.camera.y + 130);
     if (button("Back to Home", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + 40, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
-        //clear_screen(color_white());
+        // clear_screen(color_white());
         game.state = PREPARE_GAME;
     }
     if (button("Exit Program", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + 40 + BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT)))
@@ -479,6 +497,28 @@ void draw_explorer(const explorer_data &explorer, game_data &game)
         break;
     }
 
+    bitmap sound_state;
+    if (music_volume() == 0)
+    {
+        sound_state = sound_off_icon;
+    }
+    else
+    {
+        sound_state = sound_on_icon;
+    }
+
+    if (bitmap_button(sound_state, rectangle_from(WINDOW_WIDTH - 52, WINDOW_HEIGHT - 52, 50, 50)))
+    {
+        if (music_volume() == 0)
+        {
+            set_music_volume(MUSIC_VOLUME);
+        }
+        else
+        {
+            set_music_volume(0);
+        }
+    }
+
     draw_interface();
     refresh_screen();
 }
@@ -488,21 +528,27 @@ void handle_editor_input(explorer_data &explorer)
 {
     if (key_typed(NUM_1_KEY))
     {
-        explorer.editor_tile_kind = NORMAL_TILE;
+        explorer.editor_tile_kind = BORDER_TILE;
     }
     if (key_typed(NUM_2_KEY))
     {
-        explorer.editor_tile_kind = BORDER_TILE;
+        explorer.editor_tile_kind = NORMAL_TILE;
     }
 
     if (mouse_down(LEFT_BUTTON))
     {
+
         point_2d mouse_pos = mouse_position();
         int c = (mouse_pos.x + explorer.camera.x) / TILE_WIDTH;
         int r = (mouse_pos.y + explorer.camera.y) / TILE_HEIGHT;
 
         if (c >= 0 && c < MAX_MAP_COLS && r >= 0 && r < MAX_MAP_ROWS)
         {
+            if (!sound_effect_playing("Drawing Sound"))
+            {
+                play_sound_effect("Drawing Sound");
+            }
+
             if (explorer.editor_tile_kind == NORMAL_TILE)
             {
                 if (explorer.map.tiles[c][r].kind == FIX_TILE || explorer.map.tiles[c][r].kind == BORDER_TILE)
@@ -519,6 +565,10 @@ void handle_editor_input(explorer_data &explorer)
                 }
             }
         }
+    }
+    else
+    {
+        stop_sound_effect("Drawing Sound");
     }
 }
 
@@ -548,6 +598,9 @@ void handle_input(explorer_data &explorer)
 // Main function to run the game
 int main()
 {
+    play_music("Game Music");
+    set_music_volume(MUSIC_VOLUME);
+
     explorer_data explorer;
     game_data game = init_game();
     molds_data molds;
@@ -558,10 +611,16 @@ int main()
 
     while (!quit_requested())
     {
+        // Play background music
+        if (!music_playing())
+        {
+            play_music("Game Music");
+        }
 
         process_events();
         draw_explorer(explorer, game);
 
+        // Handle the prepare game state
         if (game.state == PREPARE_GAME)
         {
             init_explorer(explorer);
@@ -569,22 +628,25 @@ int main()
             molds = init_molds();
         }
 
+        // Handle the playing state
         if (game.state == PLAYING)
         {
+            // Handle player input
             handle_input(explorer);
 
+            // Check if the game is over
             if (game.is_game_over())
             {
                 game.score = timer_ticks(GAME_TIMER) / 1000;
                 game.state = GAME_OVER;
             }
 
-            int start_c, start_r;
-
+            // Check if there is space available for mold to spread
             if (is_space_available(explorer.map))
             {
                 if (molds.is_time_to_appear_next(timer_ticks(GAME_TIMER)))
                 {
+                    int start_c, start_r;
                     do
                     {
                         start_c = rnd(0, MAX_MAP_COLS - 1);
@@ -598,7 +660,7 @@ int main()
                 }
             }
 
-            // Update all molds
+            // Update current molds
             if (!molds.v.empty())
             {
                 for (int i = 0; i < molds.v.size(); i++)
@@ -610,16 +672,16 @@ int main()
                     if (molds.v[i].state == BROKEN)
                     {
                         molds.v.erase(molds.v.begin() + i); // Remove finished mold
-                        i--; // Adjust index after erasing
+                        i--;                                // Adjust index after erasing
                     }
                 }
             }
 
-            // Update game state
+            // Update game data
             update_game(game, explorer.map);
 
-            // Check if it's time to update the game
-            if (game.is_time_to_update(timer_ticks(GAME_TIMER)))
+            // Check if it's time to increase the game's difficulty
+            if (game.is_time_to_update_dif(timer_ticks(GAME_TIMER)))
             {
                 if (game.mold_appearance_speed - 0.1 > 0)
                 {
@@ -629,11 +691,16 @@ int main()
             }
         }
 
+        // Handle the quit game state
         if (game.state == QUIT)
         {
             return 0;
         }
     }
+
+    // Free resources
+    free_all_sound_effects();
+    free_all_music();
 
     return 0;
 }
