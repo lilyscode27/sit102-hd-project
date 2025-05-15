@@ -3,13 +3,14 @@
 #include <queue>
 #include <fstream>
 #include <algorithm>
+
 using namespace std;
 
 using std::to_string;
 
 // TODO: Beautify the interface
-// TODO: Add players
 // TODO: Add instructions
+// TODO: Add difficulty levels
 
 // Constants for window size and map dimensions
 const int WINDOW_WIDTH = 800;
@@ -30,12 +31,13 @@ const double MUSIC_VOLUME = 0.3;
 
 // Constants for the game
 const string GAME_TIMER = "Game Timer";
-const long GAME_UPDATE_INTERVAL = 20;  // Interval for updating game difficulty
-const string SCORE_FILE = "score.txt"; // File to store scores
+const long GAME_UPDATE_INTERVAL = 20000; // Interval for updating game difficulty
+const string SCORE_FILE = "score.txt";   // File to store scores
 
 // Constants for the interface
-const int BUTTON_WIDTH = 100;
+const int BUTTON_WIDTH = 150;
 const int BUTTON_HEIGHT = 30;
+const int LINE_SPACING = 20;
 
 // Directions for 8-connected neighbors (up, down, left, right, and diagonals)
 const int DX[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
@@ -149,10 +151,10 @@ struct game_data
     double border_proportion;     // Proportion of border tiles
     long last_update_dif_time;    // Last time the game difficulty was updated
     molds_data molds;             // Data for the molds
-    double mold_appearance_speed; // Speed of mold appearance
+    long mold_appearance_time;   // Time of mold appearance
     game_state state;             // Current state of the game
     int score;                    // Score of the game
-    bool is_score_saved;          // Flag to indicate if the score is saved
+    bool is_player_score_saved;   // Flag to indicate if the score is saved
 
     // Check if it's time to update the game difficulty
     bool is_time_to_update_dif(long current_time) const
@@ -173,13 +175,13 @@ struct game_effect_data
 };
 
 // Function to save the score to a file
-bool save_score_to_file(int score)
+bool save_score_to_file(game_data &game)
 {
     std::ofstream score_file(SCORE_FILE, std::ios::app); // Open file in append mode
     if (score_file.is_open())
     {
-        score_file << score << "\n"; // Write the score to the file
-        score_file.close();          // Close the file
+        score_file << game.score << "\n"; // Write the score to the file
+        score_file.close();               // Close the file
         write_line("Score saved to score.txt");
         return true;
     }
@@ -189,11 +191,6 @@ bool save_score_to_file(int score)
         return false;
     }
 }
-
-#include <algorithm> // For std::sort
-#include <vector>
-#include <fstream>
-#include <string>
 
 // Function to get the top 5 highest scores from the file
 std::vector<int> get_top_5_scores()
@@ -280,10 +277,10 @@ game_data init_game()
     game.border_proportion = 0.0;
     game.last_update_dif_time = 0;
     game.molds = init_molds(); // Initialize molds data
-    game.mold_appearance_speed = 1;
+    game.mold_appearance_time = 0;
     game.state = PREPARE_GAME;
     game.score = 0;
-    game.is_score_saved = false; // Initialize score saved flag
+    game.is_player_score_saved = false; // Initialize score saved flag
     return game;
 }
 
@@ -507,13 +504,31 @@ void draw_map(const map_data &map, const point_2d &camera)
 // Frunction to draw the prepare game interface
 void prepare_interface(game_data &game)
 {
-    clear_screen(color_dark_olive_green());
-    if (button("Start Game", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    clear_screen(color_yellow_green());
+    set_camera_position(point_at(0, 0));
+
+    if (button("Start Game: Easy", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT * 2, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
+        game.mold_appearance_time = 10000;
         game.state = PLAYING;
         reset_timer(GAME_TIMER);
         start_timer(GAME_TIMER);
     }
+    if (button("Start Game: Medium", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    {
+        game.mold_appearance_time = 8000;
+        game.state = PLAYING;
+        reset_timer(GAME_TIMER);
+        start_timer(GAME_TIMER);
+    }
+    if (button("Start Game: Hard", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    {
+        game.mold_appearance_time = 5000;
+        game.state = PLAYING;
+        reset_timer(GAME_TIMER);
+        start_timer(GAME_TIMER);
+    }
+
     if (button("Exit Program", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.state = QUIT;
@@ -521,12 +536,10 @@ void prepare_interface(game_data &game)
 
     vector<int> top_scores = get_top_5_scores();
     string scores_text = "Top 5 Scores:\n";
-    int space = 20;
     for (int i = 0; i < top_scores.size(); i++)
     {
-        draw_text(to_string(i + 1) + ". " + to_string(top_scores[i]), color_black(), (WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT + space + space * (i + 1));
+        draw_text(to_string(i + 1) + ". " + to_string(top_scores[i]), color_black(), (WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT + LINE_SPACING + LINE_SPACING * (i + 1));
     }
-    
 }
 
 // Function to draw the playing interface
@@ -567,12 +580,12 @@ void playing_interface(const explorer_data &explorer, game_data &game)
     }
 
     // Draw the editor to change tile kind
-    draw_rectangle(color_black(), explorer.camera.x, explorer.camera.y + 10, 50, 50);
-    fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
-    draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + 20, 30, 30);
     draw_text("Editor: Enter 1 for BORDER_TILE, 2 for NORMAL_TILE", color_black(), explorer.camera.x, explorer.camera.y + 10);
+    draw_rectangle(color_black(), explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING, 50, 50);
+    fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), explorer.camera.x + 10, explorer.camera.y + 20 + LINE_SPACING, 30, 30);
+    draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + LINE_SPACING * 2, 30, 30);
 
-    draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 70);
+    draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING * 4);
 
     if (button("Pause Game", rectangle_from(WINDOW_WIDTH - BUTTON_WIDTH, 0, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
@@ -599,12 +612,12 @@ void pausing_interface(game_data &game)
 void game_over_interface(explorer_data explorer, game_data &game)
 {
     draw_text("Game Over", color_red(), explorer.camera.x, explorer.camera.y + 100);
-    draw_text("You survived for " + to_string(game.score) + " seconds.", color_red(), explorer.camera.x, explorer.camera.y + 130);
+    draw_text("You survived for " + to_string(game.score) + " seconds.", color_red(), explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING * 5);
 
-    if (game.is_score_saved == false)
+    if (game.is_player_score_saved == false)
     {
         // Save the score to a file
-        game.is_score_saved = save_score_to_file(game.score);
+        game.is_player_score_saved = save_score_to_file(game);
     }
 
     if (button("Back to Home", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + 40, BUTTON_WIDTH, BUTTON_HEIGHT)))
@@ -804,7 +817,8 @@ int main()
                     mold_data new_mold = init_mold(start_c, start_r); // Initialize new mold
                     game.molds.v.push_back(new_mold);                 // Add new mold to the vector
 
-                    game.molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 * game.mold_appearance_speed + rnd(0, 2000); // Set time for next mold appearance
+                    // game.molds.time_to_appear_next = timer_ticks(GAME_TIMER) + 5000 * game.mold_appearance_speed + rnd(0, 2000); // Set time for next mold appearance
+                    game.molds.time_to_appear_next = timer_ticks(GAME_TIMER) + game.mold_appearance_time + rnd(0, 2000); // Set time for next mold appearance
                 }
             }
 
@@ -827,16 +841,6 @@ int main()
 
             // Update game data
             update_game(game, explorer.map);
-
-            // Check if it's time to increase the game's difficulty
-            if (game.is_time_to_update_dif(timer_ticks(GAME_TIMER)))
-            {
-                if (game.mold_appearance_speed - 0.1 > 0)
-                {
-                    game.mold_appearance_speed -= 0.1;
-                    game.last_update_dif_time = timer_ticks(GAME_TIMER);
-                }
-            }
         }
 
         // Handle the quit game state
