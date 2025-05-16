@@ -8,10 +8,6 @@ using namespace std;
 
 using std::to_string;
 
-// TODO: Beautify the interface
-// TODO: Add instructions
-// TODO: Add difficulty levels
-
 // Constants for window size and map dimensions
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
@@ -107,7 +103,6 @@ struct mold_data
     // // Location to start spreading from
     int start_c;
     int start_r;
-    // location_data start_loc; // Start location of the mold
 
     mold_state state; // Current state of the mold
 
@@ -142,8 +137,9 @@ struct molds_data
 
 struct attention_data
 {
-    location_data loc; // Location of the attention icon
-    bool is_visible;   // Flag to indicate if the attention icon is visible
+    int new_r; // The row to draw the attention icon at
+    int new_c; // The column to draw the attention icon at
+    string visibility;  // Visibility status (left, right, top, bottom)
 };
 
 // Structure to represent the current game data
@@ -151,18 +147,11 @@ struct game_data
 {
     double broken_proportion;   // Proportion of broken tiles
     double border_proportion;   // Proportion of border tiles
-    long last_update_dif_time;  // Last time the game difficulty was updated
     molds_data molds;           // Data for the molds
     long mold_appearance_time;  // Time of mold appearance
     game_state state;           // Current state of the game
     int score;                  // Score of the game
     bool is_player_score_saved; // Flag to indicate if the score is saved
-
-    // Check if it's time to update the game difficulty
-    bool is_time_to_update_dif(long current_time) const
-    {
-        return current_time > last_update_dif_time + GAME_UPDATE_INTERVAL;
-    }
 
     // Check if the game is over (80% of tiles are broken or blocked by border tiles)
     bool is_game_over()
@@ -228,8 +217,7 @@ std::vector<int> get_top_5_scores()
 }
 
 // Function to initialize a location
-location_data
-init_loc(int c, int r)
+location_data init_loc(int c, int r)
 {
     location_data loc;
     loc.c = c;
@@ -277,7 +265,6 @@ game_data init_game()
     game_data game;
     game.broken_proportion = 0.0;
     game.border_proportion = 0.0;
-    game.last_update_dif_time = 0;
     game.molds = init_molds(); // Initialize molds data
     game.mold_appearance_time = 0;
     game.state = PREPARE_GAME;
@@ -398,7 +385,6 @@ bool is_space_available(map_data &map)
 // Function to update the game data
 void update_game(game_data &game, const map_data &map)
 {
-    int normal_tiles = 0;
     int broken_tiles = 0;
     int border_tiles = 0;
 
@@ -406,11 +392,7 @@ void update_game(game_data &game, const map_data &map)
     {
         for (int j = 0; j < MAX_MAP_ROWS; j++)
         {
-            if (map.tiles[i][j].kind == NORMAL_TILE)
-            {
-                normal_tiles++;
-            }
-            else if (map.tiles[i][j].kind == BROKEN_TILE)
+            if (map.tiles[i][j].kind == BROKEN_TILE)
             {
                 broken_tiles++;
             }
@@ -460,25 +442,71 @@ void draw_tile(tile_data tile, int x, int y)
 }
 
 // Function to determine whether a mold is off the visible map
-string is_mold_visible(int col, int row, const point_2d &camera)
+attention_data is_mold_visible(int mold_start_c, int mold_start_r, const point_2d &camera)
 {
+    attention_data attention;
+
     // Calculate the visible range of columns and rows
-    int start_col = camera.x / TILE_WIDTH;
-    int end_col = (camera.x + screen_width()) / TILE_WIDTH;
-    int start_row = camera.y / TILE_HEIGHT;
-    int end_row = (camera.y + screen_height()) / TILE_HEIGHT;
+    int map_start_c = camera.x / TILE_WIDTH;
+    int map_end_c = (camera.x + screen_width()) / TILE_WIDTH;
+    int map_start_r = camera.y / TILE_HEIGHT;
+    int map_end_r = (camera.y + screen_height()) / TILE_HEIGHT;
 
     // Determine the relative position of the mold
-    if (col < start_col)
-        return "Left";
-    else if (col > end_col)
-        return "Right";
-    else if (row < start_row)
-        return "Top";
-    else if (row > end_row)
-        return "Bottom";
+    if (mold_start_c < map_start_c)
+    {
+        attention.visibility = "Left";
+        attention.new_r = mold_start_r - map_start_r;
+
+        // Ensure the new row is within bounds
+        if (attention.new_r < 0) 
+            attention.new_r = 0;
+        else if (attention.new_r >= WINDOW_HEIGHT / TILE_HEIGHT)
+            attention.new_r = WINDOW_HEIGHT / TILE_HEIGHT - 1;
+    }
+
+    else if (mold_start_c > map_end_c)
+    {
+        attention.visibility = "Right";
+        attention.new_r = mold_start_r - map_start_r;
+
+        // Ensure the new row is within bounds
+        if (attention.new_r < 0)
+            attention.new_r = 0;
+        else if (attention.new_r >= WINDOW_HEIGHT / TILE_HEIGHT)
+            attention.new_r = WINDOW_HEIGHT / TILE_HEIGHT - 1;
+    }
+
+    else if (mold_start_r < map_start_r)
+    {
+        attention.visibility = "Top";
+        attention.new_c = mold_start_c - map_start_c;
+
+        // Ensure the new column is within bounds
+        if (attention.new_c < 0)
+            attention.new_c = 0;
+        else if (attention.new_c >= WINDOW_WIDTH / TILE_WIDTH)
+            attention.new_c = WINDOW_WIDTH / TILE_WIDTH - 1;
+    }
+
+    else if (mold_start_r > map_end_r)
+    {
+        attention.visibility = "Bottom";
+        attention.new_c = mold_start_c - map_start_c;
+
+        // Ensure the new column is within bounds
+        if (attention.new_c < 0)
+            attention.new_c = 0;
+        else if (attention.new_c >= WINDOW_WIDTH / TILE_WIDTH)
+            attention.new_c = WINDOW_WIDTH / TILE_WIDTH - 1;
+    }
+
     else
-        return "Visible";
+    {
+        attention.visibility = "Visible";
+    }
+
+    return attention;
 }
 
 // Function to draw the entire map based on the camera position
@@ -557,28 +585,28 @@ void playing_interface(const explorer_data &explorer, game_data &game)
     draw_map(explorer.map, explorer.camera);
 
     // Draw the attention icon for molds that are off the visible map
-    for (int i = 0; i < game.molds.v.size(); i++)
+    if (!game.molds.v.empty())
     {
-        if (game.molds.v[i].state == SPREADING)
+        for (int i = 0; i < game.molds.v.size(); i++)
         {
             if (game.molds.v[i].state == SPREADING)
             {
-                string tile_visibility = is_mold_visible(game.molds.v[i].start_c, game.molds.v[i].start_r, explorer.camera);
-                if (tile_visibility == "Left")
+                attention_data attention = is_mold_visible(game.molds.v[i].start_c, game.molds.v[i].start_r, explorer.camera);
+                if (attention.visibility == "Left")
                 {
-                    draw_bitmap(ATTENTION_ICON, explorer.camera.x, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x, explorer.camera.y + attention.new_r * TILE_HEIGHT);
                 }
-                else if (tile_visibility == "Right")
+                else if (attention.visibility == "Right")
                 {
-                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + attention.new_r * TILE_HEIGHT);
                 }
-                else if (tile_visibility == "Top")
+                else if (attention.visibility == "Top")
                 {
-                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + attention.new_c * TILE_WIDTH, explorer.camera.y);
                 }
-                else if (tile_visibility == "Bottom")
+                else if (attention.visibility == "Bottom")
                 {
-                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + attention.new_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
                 }
             }
         }
@@ -782,7 +810,7 @@ int main()
     while (!quit_requested())
     {
         // Play background music
-        if (!music_playing())
+        if (!music_playing() && game_effect.is_sound_on)
         {
             play_music("Game Music");
         }
