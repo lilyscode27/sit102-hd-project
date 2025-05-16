@@ -21,12 +21,14 @@ const int TILE_WIDTH = 30;
 const int TILE_HEIGHT = 30;
 
 // Constants for the game resources
-const music game_music = load_music("Game Music", "game-music.mp3");
-const sound_effect drawing_sound = load_sound_effect("Drawing Sound", "drawing-sound.mp3");
-const bitmap pause_icon = load_bitmap("Pause Button", "pause.png");
-const bitmap sound_on_icon = load_bitmap("Sound On", "sound-on.png");
-const bitmap sound_off_icon = load_bitmap("Sound Off", "sound-off.png");
-const bitmap attention_icon = load_bitmap("Attention Icon", "attention.png");
+const music GAME_MUSIC = load_music("Game Music", "game-music.mp3");
+const sound_effect DRAWING_SOUND = load_sound_effect("Drawing Sound", "drawing-sound.mp3");
+const bitmap MOLD_PIC = load_bitmap("Mold Pic", "mold_pic1_mod.png");
+const bitmap PAUSE_ICON = load_bitmap("Pause Button", "pause.png");
+const bitmap SOUND_ON_ICON = load_bitmap("Sound On", "sound-on.png");
+const bitmap SOUND_OFF_ICON = load_bitmap("Sound Off", "sound-off.png");
+const bitmap ATTENTION_ICON = load_bitmap("Attention Icon", "attention.png");
+const font TEXT_FONT = load_font("Text Font", "DynaPuff-VariableFont_wdth,wght.ttf");
 const double MUSIC_VOLUME = 0.3;
 
 // Constants for the game
@@ -147,14 +149,14 @@ struct attention_data
 // Structure to represent the current game data
 struct game_data
 {
-    double broken_proportion;     // Proportion of broken tiles
-    double border_proportion;     // Proportion of border tiles
-    long last_update_dif_time;    // Last time the game difficulty was updated
-    molds_data molds;             // Data for the molds
-    long mold_appearance_time;   // Time of mold appearance
-    game_state state;             // Current state of the game
-    int score;                    // Score of the game
-    bool is_player_score_saved;   // Flag to indicate if the score is saved
+    double broken_proportion;   // Proportion of broken tiles
+    double border_proportion;   // Proportion of border tiles
+    long last_update_dif_time;  // Last time the game difficulty was updated
+    molds_data molds;           // Data for the molds
+    long mold_appearance_time;  // Time of mold appearance
+    game_state state;           // Current state of the game
+    int score;                  // Score of the game
+    bool is_player_score_saved; // Flag to indicate if the score is saved
 
     // Check if it's time to update the game difficulty
     bool is_time_to_update_dif(long current_time) const
@@ -507,21 +509,25 @@ void prepare_interface(game_data &game)
     clear_screen(color_yellow_green());
     set_camera_position(point_at(0, 0));
 
-    if (button("Start Game: Easy", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT * 2, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    draw_bitmap(MOLD_PIC, (WINDOW_WIDTH - 200) / 2, 0);
+
+    draw_text("Welcome to Moldbound!", color_dark_olive_green(), "Text Font", 50, 120, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT * 3 - 50 + 50);
+
+    if (button("Start Game: Easy", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT * 2 + 50, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.mold_appearance_time = 10000;
         game.state = PLAYING;
         reset_timer(GAME_TIMER);
         start_timer(GAME_TIMER);
     }
-    if (button("Start Game: Medium", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    if (button("Start Game: Medium", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 - BUTTON_HEIGHT + 50, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.mold_appearance_time = 8000;
         game.state = PLAYING;
         reset_timer(GAME_TIMER);
         start_timer(GAME_TIMER);
     }
-    if (button("Start Game: Hard", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    if (button("Start Game: Hard", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + 50, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.mold_appearance_time = 5000;
         game.state = PLAYING;
@@ -529,16 +535,15 @@ void prepare_interface(game_data &game)
         start_timer(GAME_TIMER);
     }
 
-    if (button("Exit Program", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT)))
+    if (button("Exit Program", rectangle_from((WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT + 50, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
         game.state = QUIT;
     }
 
     vector<int> top_scores = get_top_5_scores();
-    string scores_text = "Top 5 Scores:\n";
     for (int i = 0; i < top_scores.size(); i++)
     {
-        draw_text(to_string(i + 1) + ". " + to_string(top_scores[i]), color_black(), (WINDOW_WIDTH - BUTTON_WIDTH) / 2, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT + LINE_SPACING + LINE_SPACING * (i + 1));
+        draw_text(to_string(i + 1) + ". " + to_string(top_scores[i]), color_black(), "Text Font", 20, (WINDOW_WIDTH - BUTTON_WIDTH) / 2 + 50, (WINDOW_HEIGHT - BUTTON_HEIGHT) / 2 + BUTTON_HEIGHT + LINE_SPACING + LINE_SPACING * (i + 1) + 50);
     }
 }
 
@@ -561,31 +566,31 @@ void playing_interface(const explorer_data &explorer, game_data &game)
                 string tile_visibility = is_mold_visible(game.molds.v[i].start_c, game.molds.v[i].start_r, explorer.camera);
                 if (tile_visibility == "Left")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
                 }
                 else if (tile_visibility == "Right")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + WINDOW_WIDTH - TILE_WIDTH, explorer.camera.y + game.molds.v[i].start_r * TILE_HEIGHT);
                 }
                 else if (tile_visibility == "Top")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y);
                 }
                 else if (tile_visibility == "Bottom")
                 {
-                    draw_bitmap(attention_icon, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
+                    draw_bitmap(ATTENTION_ICON, explorer.camera.x + game.molds.v[i].start_c * TILE_WIDTH, explorer.camera.y + WINDOW_HEIGHT - TILE_HEIGHT);
                 }
             }
         }
     }
 
     // Draw the editor to change tile kind
-    draw_text("Editor: Enter 1 for BORDER_TILE, 2 for NORMAL_TILE", color_black(), explorer.camera.x, explorer.camera.y + 10);
+    draw_text("Editor: Enter 1 for BORDER_TILE, 2 for NORMAL_TILE", color_sea_green(), "Text Font", 15, explorer.camera.x, explorer.camera.y);
     draw_rectangle(color_black(), explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING, 50, 50);
     fill_rectangle(color_for_tile_kind(explorer.editor_tile_kind), explorer.camera.x + 10, explorer.camera.y + 20 + LINE_SPACING, 30, 30);
     draw_rectangle(color_black(), explorer.camera.x + 10, explorer.camera.y + LINE_SPACING * 2, 30, 30);
 
-    draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_black(), explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING * 4);
+    draw_text("Percentage of map unavailable: " + to_string(game.broken_proportion + game.border_proportion) + "%", color_sea_green(), "Text Font", 15, explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING * 4);
 
     if (button("Pause Game", rectangle_from(WINDOW_WIDTH - BUTTON_WIDTH, 0, BUTTON_WIDTH, BUTTON_HEIGHT)))
     {
@@ -611,8 +616,8 @@ void pausing_interface(game_data &game)
 // Function to draw the game over interface
 void game_over_interface(explorer_data explorer, game_data &game)
 {
-    draw_text("Game Over", color_red(), explorer.camera.x, explorer.camera.y + 100);
-    draw_text("You survived for " + to_string(game.score) + " seconds.", color_red(), explorer.camera.x, explorer.camera.y + 10 + LINE_SPACING * 5);
+    draw_text("Game Over", color_red(), "Text Font", 15, explorer.camera.x + 300 + 70, explorer.camera.y + 280);
+    draw_text("You survived for " + to_string(game.score) + " seconds.", color_red(), "Text Font", 15, explorer.camera.x + 300, explorer.camera.y + 280 + LINE_SPACING);
 
     if (game.is_player_score_saved == false)
     {
@@ -656,11 +661,11 @@ void draw_explorer(const explorer_data &explorer, game_data &game, game_effect_d
     bitmap sound_state;
     if (music_volume() == 0)
     {
-        sound_state = sound_off_icon;
+        sound_state = SOUND_OFF_ICON;
     }
     else
     {
-        sound_state = sound_on_icon;
+        sound_state = SOUND_ON_ICON;
     }
 
     if (bitmap_button(sound_state, rectangle_from(WINDOW_WIDTH - 52, WINDOW_HEIGHT - 52, 50, 50)))
@@ -766,6 +771,9 @@ int main()
     explorer_data explorer;
     game_data game = init_game();
     game_effect_data game_effect = init_game_effect();
+
+    set_interface_accent_color(color_dark_olive_green(), 1.0);
+    set_interface_font("Text Font");
 
     open_window("Moldbound", WINDOW_WIDTH, WINDOW_HEIGHT);
 
