@@ -16,14 +16,14 @@ const int TILE_WIDTH = 30;
 const int TILE_HEIGHT = 30;
 
 // Constants for the game resources
-const music GAME_MUSIC = load_music("Game Music", "game-music.mp3");
-const sound_effect DRAWING_SOUND = load_sound_effect("Drawing Sound", "drawing-sound.mp3");
-const bitmap MOLD_PIC = load_bitmap("Mold Pic", "mold_pic1_mod.png");
-const bitmap PAUSE_ICON = load_bitmap("Pause Button", "pause.png");
-const bitmap SOUND_ON_ICON = load_bitmap("Sound On", "sound-on.png");
-const bitmap SOUND_OFF_ICON = load_bitmap("Sound Off", "sound-off.png");
-const bitmap ATTENTION_ICON = load_bitmap("Attention Icon", "attention.png");
-const font TEXT_FONT = load_font("Text Font", "DynaPuff-VariableFont_wdth,wght.ttf");
+const music GAME_MUSIC = load_music("Game Music", "audio-resources\\game-music.mp3");
+const sound_effect DRAWING_SOUND = load_sound_effect("Drawing Sound", "audio-resources\\drawing-sound.mp3");
+const bitmap MOLD_PIC = load_bitmap("Mold Pic", "images-resources\\mold_pic.png");
+const bitmap PAUSE_ICON = load_bitmap("Pause Button", "images-resources\\pause.png");
+const bitmap SOUND_ON_ICON = load_bitmap("Sound On", "images-resources\\sound-on.png");
+const bitmap SOUND_OFF_ICON = load_bitmap("Sound Off", "images-resources\\sound-off.png");
+const bitmap ATTENTION_ICON = load_bitmap("Attention Icon", "images-resources\\attention.png");
+const font TEXT_FONT = load_font("Text Font", "other-resources\\DynaPuff-VariableFont_wdth,wght.ttf");
 const double MUSIC_VOLUME = 0.3;
 
 // Constants for the game
