@@ -106,13 +106,21 @@ int main()
         {0, 0, 0, 1, 1},
         {0, 0, 0, 0, 0}};
 
+    // Initial grid for BFS with all cells as 1
+    int grid3[ROWS][COLUMNS] = {
+        {1, 1, 1, 1, 1},
+        {1, 1, 1, 1, 1},
+        {1, 1, 1, 1, 1},
+        {1, 1, 1, 1, 1},
+        {1, 1, 1, 1, 1}};
+
     // Perform Flood Fill using DFS
     cout << "Flood Fill using DFS: " << endl;
     flood_fill_dfs(grid1, 1, 1, 1, 2);
 
     // Perform Flood Fill using BFS
     cout << "Flood Fill using BFS: " << endl;
-    flood_fill_bfs(grid2, 1, 1, 1, 2);
+    flood_fill_bfs(grid3, 1, 1, 1, 2);
 
     return 0;
 }
