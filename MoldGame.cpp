@@ -15,7 +15,7 @@ const int MAX_MAP_COLS = 40;
 const int TILE_WIDTH = 30;
 const int TILE_HEIGHT = 30;
 
-// Constants for the game resources
+// Constants for the game's resources
 const music GAME_MUSIC = load_music("Game Music", "audio-resources\\game-music.mp3");
 const sound_effect DRAWING_SOUND = load_sound_effect("Drawing Sound", "audio-resources\\drawing-sound.mp3");
 const bitmap MOLD_PIC = load_bitmap("Mold Pic", "images-resources\\mold_pic.png");
