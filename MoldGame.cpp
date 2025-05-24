@@ -31,7 +31,7 @@ const string GAME_TIMER = "Game Timer";
 const long MOLD_SPREAD_TIME = 1000; // Time interval for mold spreading
 const long MOLD_FIX_TIME = 5000;   // Time interval for mold fixing
 const long GAME_UPDATE_INTERVAL = 20000; // Interval for updating game difficulty
-const string SCORE_FILE = "score.txt";   // File to store scores
+const string SCORE_FILE = "scores.txt";   // File to store scores
 
 // Constants for the interface
 const int BUTTON_WIDTH = 150;
