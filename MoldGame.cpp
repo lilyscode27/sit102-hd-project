@@ -19,7 +19,6 @@ const int TILE_HEIGHT = 30;
 const music GAME_MUSIC = load_music("Game Music", "audio-resources\\game-music.mp3");
 const sound_effect DRAWING_SOUND = load_sound_effect("Drawing Sound", "audio-resources\\drawing-sound.mp3");
 const bitmap MOLD_PIC = load_bitmap("Mold Pic", "images-resources\\mold_pic.png");
-const bitmap PAUSE_ICON = load_bitmap("Pause Button", "images-resources\\pause.png");
 const bitmap SOUND_ON_ICON = load_bitmap("Sound On", "images-resources\\sound-on.png");
 const bitmap SOUND_OFF_ICON = load_bitmap("Sound Off", "images-resources\\sound-off.png");
 const bitmap ATTENTION_ICON = load_bitmap("Attention Icon", "images-resources\\attention.png");
